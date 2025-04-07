@@ -2,18 +2,12 @@ from flask import Flask, request, jsonify
 import numpy as np
 import tensorflow as tf
 import joblib
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
 
 app = Flask(__name__)
 
 # Load model
 model = tf.keras.models.load_model('model_rnn_konsumsi.keras')
-# Load scaler
-# scaler = joblib.load('scaler.pkl')
-# Normalisasi data
-scaler_X = MinMaxScaler()
-scaler_y = MinMaxScaler()
+scaler_y = joblib.load('scaler_y.save')
 
 @app.route('/')
 def index():
@@ -21,16 +15,20 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.get_json()
+    data = request.json['data']  # ex: [108, 40, 40]
     
-    # Data input harus dalam format array: [val1, val2, val3]
-    input_data = np.array(data['data'])
-    input_scaled = scaler_X.transform(input_data)
-    input_scaled = input_scaled.reshape(1, len(data['data']), 1)
-    pred_scaled = model.predict(input_scaled)
-    pred = scaler_y.inverse_transform(pred_scaled)
+    # Ambil nilai terakhir sebagai input prediksi
+    input_data = np.array(data[-1:]).reshape(1, 1, 1)
     
-    return jsonify({'prediksi': float(pred[0][0])})
-
+    # Lakukan scaling (optional, kalau kamu ingin juga simpan scaler_X)
+    # Tapi kalau input sudah distandardkan manual, bisa langsung saja:
+    
+    pred_scaled = model.predict(input_data)
+    
+    # Inverse scaling ke bentuk asli
+    pred_original = scaler_y.inverse_transform(pred_scaled)
+    
+    return jsonify({'prediksi': float(pred_original[0][0])})
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
