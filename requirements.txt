@@ -1,4 +1,5 @@
-flask
-tensorflow
+Flask
 gunicorn
 os
+numpy
+tensorflow
