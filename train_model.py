@@ -10,14 +10,13 @@ from tensorflow.keras.layers import LSTM, Dense
 
 train_bp = Blueprint('train_model', __name__)
 
-@train_bp.route('/train_model', methods=['POST'])
-def train_model():
+def train_and_save_model():
     db_config = {
-        'user': os.getenv('DB_USERNAME', 'root'),
-        'password': os.getenv('DB_PASSWORD', 'ThpPEjAeCkstBjBiUdtmqcqwYRGhbyKh'),
-        'host': os.getenv('DB_HOST', 'switchback.proxy.rlwy.net'),
-        'port': int(os.getenv('DB_PORT', 53354)),
-        'database': os.getenv('DB_DATABASE', 'railway')
+        'user': 'root',
+        'password': 'ThpPEjAeCkstBjBiUdtmqcqwYRGhbyKh',
+        'host': 'switchback.proxy.rlwy.net',
+        'port': 53354,
+        'database': 'railway'
     }
 
     try:
@@ -34,36 +33,28 @@ def train_model():
 
         # Urutkan dan kelompokkan
         grouped = df.groupby('customer_id')['pemakaian_kwh'].apply(list).reset_index()
-        print(grouped)
         # Siapkan sequence (X, y)
         sequences = []
         for _, row in grouped.iterrows():
-            konsumsi = row['pemakaian_kwh']
-            if len(konsumsi) >= 2:
-                for i in range(len(konsumsi) - 1):
-                    X_seq = konsumsi[i:i+1]
-                    y_seq = konsumsi[i+1]
-                    sequences.append((X_seq, y_seq))
+            usage = group['pemakaian_kwh'].values
+            if len(usage) >= 13:
+                for i in range(len(usage) - 12):
+                    sequences.append(usage[i:i+12])
+                    targets.append(usage[i+12])
 
-        X = np.array([x for x, y in sequences])
-        y = np.array([y for x, y in sequences])
+        scaler = MinMaxScaler()
+        X_scaled = scaler.fit_transform(X.reshape(-1, 1)).reshape(X.shape)
+        y_scaled = scaler.fit_transform(y.reshape(-1, 1))
 
-        # Reshape untuk LSTM
-        X = X.reshape((X.shape[0], X.shape[1], 1))
-
-        # Normalisasi
-        scaler_X = MinMaxScaler()
-        scaler_y = MinMaxScaler()
-
-        X = scaler_X.fit_transform(X.reshape(-1, 1)).reshape(X.shape)
-        y = scaler_y.fit_transform(y.reshape(-1, 1))
-
-        model = Sequential()
-        model.add(LSTM(50, activation='relu', input_shape=(1, 1)))
-        model.add(Dense(1))
+        # Buat dan latih model
+        model = Sequential([
+            LSTM(64, activation='relu', input_shape=(12, 1)),
+            Dense(1)
+        ])
         model.compile(optimizer='adam', loss='mse')
-        model.fit(X, y, epochs=300, verbose=0)
+        model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=0)
 
+        # Simpan model
         model.save('model_rnn_konsumsi.keras')
         return jsonify({'message': 'Model retrained successfully'}), 200
 

@@ -3,17 +3,25 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from train_model import train_bp  # ✅ import blueprint
+from train_model import train_bp, train_and_save_model
 
 app = Flask(__name__)
-app.register_blueprint(train_bp)  # ✅ daftarkan blueprint
+app.register_blueprint(train_bp)
 
-# Load model
-model = tf.keras.models.load_model('model_rnn_konsumsi.keras')
+model = None
+model_path = 'model_rnn_konsumsi.keras'
+
+if os.path.exists(model_path):
+    load_model()
+
+def load_model():
+    global model
+    model = tf.keras.models.load_model(model_path)
 
 @app.route('/')
 def index():
-    return "API Prediksi Konsumsi Listrik RNN"
+    status = "tersedia" if model else "tidak tersedia"
+    return f"API Prediksi Konsumsi Listrik RNN (Model {status})"
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -26,6 +34,7 @@ def predict():
 def train():
     try:
         train_and_save_model()
+        load_model()
         return {"message": "Model retrained and saved successfully"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
