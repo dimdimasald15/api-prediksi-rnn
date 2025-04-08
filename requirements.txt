@@ -1,5 +1,4 @@
 Flask
 gunicorn
-os
 numpy
 tensorflow
