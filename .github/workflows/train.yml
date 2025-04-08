@@ -1,0 +1,15 @@
+# .github/workflows/train.yml
+name: Weekly Model Training
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Mingguan
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call /train_model endpoint
+        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/train_model

@@ -3,7 +3,10 @@ import os
 import numpy as np
 import tensorflow as tf
 
+from train_model import train_bp  # ✅ import blueprint
+
 app = Flask(__name__)
+app.register_blueprint(train_bp)  # ✅ daftarkan blueprint
 
 # Load model
 model = tf.keras.models.load_model('model_rnn_konsumsi.keras')
@@ -19,13 +22,13 @@ def predict():
     prediction = model.predict(input_data)
     return jsonify({'prediksi': float(prediction[0][0])})
 
-@app.route('/upload_model', methods=['PUT'])
-def upload_model():
-    if 'model' not in request.files:
-        return {'error': 'No model file provided'}, 400
-    model = request.files['model']
-    model.save('model_rnn_konsumsi.keras')
-    return {'message': 'Model updated successfully'}, 200
+@app.route('/train_model', methods=['POST'])
+def train():
+    try:
+        train_and_save_model()
+        return {"message": "Model retrained and saved successfully"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)

@@ -2,3 +2,7 @@ Flask
 gunicorn
 numpy
 tensorflow
+mysql-connector-python
+pandas
+scikit-learn
+requests
