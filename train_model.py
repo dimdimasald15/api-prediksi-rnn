@@ -16,10 +16,10 @@ def train_and_save_model():
             raise Exception("Koneksi database gagal")
 
         query = """
-        SELECT cs.id, cs.tarif, cs.daya, cs.kategori, cn.pemakaian_kwh
+        SELECT cn.customer_id, cs.tarif, cs.daya, cs.kategori, cn.pemakaian_kwh
         FROM consumptions cn
         JOIN customers cs ON cs.id = cn.customer_id
-        ORDER BY cs.id, cn.tahun, cn.bulan
+        ORDER BY cn.customer_id, cn.tahun, cn.bulan
         """
         df = pd.read_sql(query, conn)
         conn.close()
