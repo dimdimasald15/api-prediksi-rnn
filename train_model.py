@@ -59,7 +59,7 @@ def train_and_save_model():
         model.compile(optimizer='adam', loss='mse')
         model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1)
 
-        model.save('model_rnn_konsumsi.keras')
+        model.save('model_rnn_konsumsi.keras', save_format="keras")
         save_scaler(scaler)
 
     except Exception as e:
