@@ -3,7 +3,6 @@ import os
 import tensorflow as tf
 from train_model import train_bp
 from predict import predict_bp
-import time
 
 app = Flask(__name__)
 app.register_blueprint(train_bp)
@@ -29,7 +28,6 @@ def retrain():
     try:
         from train_model import train_and_save_model
         train_and_save_model()
-        time.sleep(1)
         load_model()
         return {"message": "Model retrained and saved successfully"}, 200
     except Exception as e:
