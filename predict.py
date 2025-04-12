@@ -42,10 +42,10 @@ def predict():
         except Exception as e:
             return jsonify({'error': f'Gagal memuat model: {str(e)}'}), 500
             
-        try:
-            scaler = load_scaler()
-        except Exception as e:
-            return jsonify({'error': f'Gagal memuat scaler: {str(e)}'}), 500
+        # try:
+        #     scaler = load_scaler()
+        # except Exception as e:
+        #     return jsonify({'error': f'Gagal memuat scaler: {str(e)}'}), 500
 
         # Koneksi database dan ambil data
         try:
