@@ -7,6 +7,8 @@ app = Flask(__name__)
 app.register_blueprint(train_bp)
 app.register_blueprint(predict_bp)
 
+model_path = 'model_rnn_konsumsi.keras'
+
 def load_model():
     global model
     model = tf.keras.models.load_model(model_path)
