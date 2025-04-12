@@ -1,4 +1,5 @@
-from flask import Blueprint
+# train_model.py
+from flask import Blueprint, jsonify
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -36,8 +37,9 @@ def train_and_save_model(progress_callback=None):
 
         df['kategori_final'] = df.apply(lambda row: kategori_tarif_daya(row['tarif'], row['daya']), axis=1)
 
-        X_raw, y_raw = [], []
         grouped = df.groupby('customer_id')
+        X, y = [], []
+
         for _, group in grouped:
             usage = group['pemakaian_kwh'].values
             tarif = group['tarif'].iloc[0]
@@ -47,27 +49,36 @@ def train_and_save_model(progress_callback=None):
             tarif_encoded = one_hot_encode(tarif, TARIF_LIST)
             kategori_encoded = one_hot_encode(kategori, KATEGORI_LIST)
             daya_scaled = [scale_daya(daya)]
-            fitur_statis = tarif_encoded + daya_scaled + kategori_encoded
+
+            fitur_statis = tarif_encoded + daya_scaled + kategori_encoded  # Total = 8 + 1 + 3 = 12 fitur
 
             if len(usage) >= 13:
                 for i in range(len(usage) - 12):
                     window = usage[i:i+12]
                     target = usage[i+12]
-                    X_raw.append([[*fitur_statis, val] for val in window])
-                    y_raw.append([target])
+                    X.append([[*fitur_statis, val] for val in window])
+                    y.append(target)
 
-        if not X_raw or not y_raw:
+        if not X or not y:
             raise Exception("Data tidak cukup untuk pelatihan model")
         update_progress(40)
 
-        X = np.array(X_raw)
-        y = np.array(y_raw)
+        X = np.array(X)
+        y = np.array(y)
 
+        # Gunakan scaler yang sama untuk X dan y
         x_scaler = MinMaxScaler()
         y_scaler = MinMaxScaler()
-        X_scaled = x_scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+        y = np.array(y).reshape(-1, 1)  # Data hasil windowing (sudah dikumpulkan sebelumnya)
         y_scaled = y_scaler.fit_transform(y)
         update_progress(50)
+
+        # Reshape dengan aman
+        X_flat = X.reshape(-1, X.shape[-1])
+        X_scaled_flat = x_scaler.fit_transform(X_flat)
+        X_scaled = X_scaled_flat.reshape(X.shape)
+        
+        y_scaled = y_scaler.fit_transform(y.reshape(-1, 1))
 
         model = Sequential([
             LSTM(64, activation='relu', input_shape=(12, X.shape[2])),
@@ -80,14 +91,16 @@ def train_and_save_model(progress_callback=None):
             def on_epoch_end(self, epoch, logs=None):
                 update_progress(50 + int((epoch + 1) / self.params['epochs'] * 40))
 
-        model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1, callbacks=[ProgressCallback()])
+        model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1)
         update_progress(95)
 
         model.save('model_rnn_konsumsi.keras')
-        save_scaler(x_scaler, 'scaler.pkl')
-        save_scaler(y_scaler, 'scaler_y.pkl')
+        save_scaler(x_scaler)  # Pastikan fungsi ini menyimpan scaler dengan benar
+        save_scaler(y_scaler, 'scaler_y.pkl') 
         update_progress(100)
 
-        return model
+        return model  # Mengembalikan model jika berhasil
+
     except Exception as e:
+        # Jangan return jsonify, tetapi raise exception agar ditangkap oleh app.py
         raise Exception(f"Error pada train_model: {str(e)}")
