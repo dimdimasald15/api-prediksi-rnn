@@ -21,7 +21,7 @@ DAYA_MAX = 66000
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
-def save_scaler(scaler, path):
+def save_scaler(scaler, path='scaler.pkl'):
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
 
