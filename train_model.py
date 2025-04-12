@@ -39,7 +39,25 @@ def train_and_save_model(progress_callback=None):
         X_raw, y_raw = [], []
         grouped = df.groupby('customer_id')
         for _, group in grouped:
-            ...
+            usage = group['pemakaian_kwh'].values
+            tarif = group['tarif'].iloc[0]
+            daya = group['daya'].iloc[0]
+            kategori = group['kategori_final'].iloc[0]
+
+            tarif_encoded = one_hot_encode(tarif, TARIF_LIST)
+            kategori_encoded = one_hot_encode(kategori, KATEGORI_LIST)
+            daya_scaled = [scale_daya(daya)]
+            fitur_statis = tarif_encoded + daya_scaled + kategori_encoded
+
+            if len(usage) >= 13:
+                for i in range(len(usage) - 12):
+                    window = usage[i:i+12]
+                    target = usage[i+12]
+                    X_raw.append([[*fitur_statis, val] for val in window])
+                    y_raw.append([target])
+
+        if not X_raw or not y_raw:
+            raise Exception("Data tidak cukup untuk pelatihan model")
         update_progress(40)
 
         X = np.array(X_raw)
