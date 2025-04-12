@@ -76,7 +76,7 @@ def train_and_save_model():
         model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1)
 
         model.save('model_rnn_konsumsi.keras')
-        # save_scaler(x_scaler)  # Pastikan fungsi ini menyimpan scaler dengan benar
+        save_scaler(x_scaler)  # Pastikan fungsi ini menyimpan scaler dengan benar
         save_scaler(y_scaler, 'scaler_y.pkl') 
 
         return model  # Mengembalikan model jika berhasil

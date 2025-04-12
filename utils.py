@@ -4,7 +4,6 @@ import pickle
 import os
 
 # Database config
-
 db_config = {
     'user': 'root',
     'password': 'ThpPEjAeCkstBjBiUdtmqcqwYRGhbyKh',
@@ -26,9 +25,15 @@ def save_scaler(scaler, path):
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
 
-def load_scaler(path):
+def load_scaler(path='scaler.pkl'):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Scaler file '{path}' tidak ditemukan. Silakan latih ulang model terlebih dahulu.")
+    with open(path, 'rb') as f:
+        return pickle.load(f)
+
+def load_y_scaler(path='scaler_y.pkl'):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Y Scaler file '{path}' tidak ditemukan. Silakan latih ulang model terlebih dahulu.")
     with open(path, 'rb') as f:
         return pickle.load(f)
 
@@ -49,6 +54,3 @@ def one_hot_encode(value, categories):
 
 def scale_daya(daya):
     return (daya - DAYA_MIN) / (DAYA_MAX - DAYA_MIN) if DAYA_MIN <= daya <= DAYA_MAX else 0.5
-
-def load_y_scaler():
-    return load('scaler_y.pkl')
