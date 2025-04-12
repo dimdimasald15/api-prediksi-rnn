@@ -6,4 +6,3 @@ mysql-connector-python
 pandas
 scikit-learn
 requests
-time
