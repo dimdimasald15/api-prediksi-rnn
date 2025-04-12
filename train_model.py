@@ -12,6 +12,9 @@ train_bp = Blueprint('train_model', __name__)
 def train_and_save_model():
     try:
         conn = get_db_connection()
+        if not conn:
+            raise Exception("Koneksi database gagal")
+
         query = """
         SELECT cs.customer_id, cs.tarif, cs.daya, cs.kategori, cn.pemakaian_kwh
         FROM consumptions cn
@@ -20,6 +23,9 @@ def train_and_save_model():
         """
         df = pd.read_sql(query, conn)
         conn.close()
+
+        if df.empty:
+            raise Exception("Data tidak ditemukan")
 
         df['kategori_final'] = df.apply(lambda row: kategori_tarif_daya(row['tarif'], row['daya']), axis=1)
 
@@ -45,12 +51,22 @@ def train_and_save_model():
                     X.append([[*fitur_statis, val] for val in window])
                     y.append(target)
 
+        if not X or not y:
+            raise Exception("Data tidak cukup untuk pelatihan model")
+
         X = np.array(X)
         y = np.array(y)
 
-        scaler = MinMaxScaler()
-        X_scaled = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
-        y_scaled = scaler.fit_transform(y.reshape(-1, 1))
+        # Gunakan scaler yang sama untuk X dan y
+        x_scaler = MinMaxScaler()
+        y_scaler = MinMaxScaler()
+
+        # Reshape dengan aman
+        X_flat = X.reshape(-1, X.shape[-1])
+        X_scaled_flat = x_scaler.fit_transform(X_flat)
+        X_scaled = X_scaled_flat.reshape(X.shape)
+        
+        y_scaled = y_scaler.fit_transform(y.reshape(-1, 1))
 
         model = Sequential([
             LSTM(64, activation='relu', input_shape=(12, X.shape[2])),
@@ -59,8 +75,11 @@ def train_and_save_model():
         model.compile(optimizer='adam', loss='mse')
         model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1)
 
-        model.save('model_rnn_konsumsi.keras', save_format="keras")
-        save_scaler(scaler)
+        model.save('model_rnn_konsumsi.keras')
+        save_scaler(x_scaler)  # Pastikan fungsi ini menyimpan scaler dengan benar
+
+        return model  # Mengembalikan model jika berhasil
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Jangan return jsonify, tetapi raise exception agar ditangkap oleh app.py
+        raise Exception(f"Error pada train_model: {str(e)}")
