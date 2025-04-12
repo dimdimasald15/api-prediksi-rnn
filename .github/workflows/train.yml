@@ -11,5 +11,5 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Call /train_model endpoint
+      - name: Call /retrain endpoint
         run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/retrain
