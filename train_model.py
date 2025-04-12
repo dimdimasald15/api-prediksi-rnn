@@ -21,7 +21,12 @@ def train_and_save_model(progress_callback=None):
             raise Exception("Koneksi database gagal")
         update_progress(5)
 
-        query = """ ... """
+        query = """
+        SELECT cn.customer_id, cs.tarif, cs.daya, cs.kategori, cn.pemakaian_kwh
+        FROM consumptions cn
+        JOIN customers cs ON cs.id = cn.customer_id
+        ORDER BY cn.customer_id, cn.tahun, cn.bulan
+        """
         with engine.connect() as conn:
             df = pd.read_sql(query, conn)
         update_progress(10)
