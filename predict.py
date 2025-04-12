@@ -3,11 +3,12 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import os
-from utils import get_db_connection, load_scaler, kategori_tarif_daya, one_hot_encode, scale_daya, TARIF_LIST, KATEGORI_LIST
+from utils import get_db_connection, load_scaler, kategori_tarif_daya, one_hot_encode, scale_daya, TARIF_LIST, KATEGORI_LIST, load_y_scaler
 
 predict_bp = Blueprint('predict', __name__)
 model_path = 'model_rnn_konsumsi.keras'
-scaler_path = 'scaler.pkl'
+# scaler_path = 'scaler.pkl'
+scaler_path = 'scaler_y.pkl'
 
 @predict_bp.route('/predict', methods=['POST'])
 def predict():
@@ -53,14 +54,14 @@ def predict():
                 return jsonify({'error': 'Koneksi database gagal'}), 500
                 
             # Ambil data historis pemakaian
-            query_usage = f"""
+            query_usage = """
                 SELECT pemakaian_kwh FROM consumptions
-                WHERE customer_id = {customer_id}
+                WHERE customer_id = %s
                 ORDER BY tahun, bulan DESC
                 LIMIT 12
             """
-            df_usage = pd.read_sql(query_usage, conn)
-            
+            df_usage = pd.read_sql(query_usage, conn, params=[customer_id])
+
             # Ambil data customer (tarif, daya, kategori)
             query_customer = f"""
                 SELECT tarif, daya, kategori FROM customers
@@ -123,12 +124,16 @@ def predict():
         # Konversi kembali ke nilai asli
         try:
             # Buat array lengkap dengan semua fitur (statis+dinamis)
-            pred_with_features = []
-            for p in prediksi:
-                pred_with_features.append([*fitur_statis, p])
+            # pred_with_features = []
+            # for p in prediksi:
+            #     pred_with_features.append([*fitur_statis, p])
                 
-            pred_array = np.array(pred_with_features)
-            prediksi_asli = scaler.inverse_transform(pred_array)[:, -1]  # Ambil hanya nilai pemakaian
+            # pred_array = np.array(pred_with_features)
+            # prediksi_asli = scaler.inverse_transform(pred_array)[:, -1]  # Ambil hanya nilai pemakaian
+            y_scaler = load_y_scaler()
+            y_pred_array = np.array(prediksi).reshape(-1, 1)
+            prediksi_asli = y_scaler.inverse_transform(y_pred_array).flatten()
+
             
             return jsonify({
                 'customer_id': customer_id,

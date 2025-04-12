@@ -22,11 +22,11 @@ DAYA_MAX = 66000
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
-def save_scaler(scaler, path='scaler.pkl'):
+def save_scaler(scaler, path):
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
 
-def load_scaler(path='scaler.pkl'):
+def load_scaler(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Scaler file '{path}' tidak ditemukan. Silakan latih ulang model terlebih dahulu.")
     with open(path, 'rb') as f:
@@ -49,3 +49,6 @@ def one_hot_encode(value, categories):
 
 def scale_daya(daya):
     return (daya - DAYA_MIN) / (DAYA_MAX - DAYA_MIN) if DAYA_MIN <= daya <= DAYA_MAX else 0.5
+
+def load_y_scaler():
+    return load('scaler_y.pkl')
