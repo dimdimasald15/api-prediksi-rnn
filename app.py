@@ -31,21 +31,26 @@ def load_model():
 
 def train_model_thread():
     global training_status, model
-    training_status["is_training"] = True
-    training_status["status"] = "training"
-    training_status["error"] = None
-    
+
+    training_status.update({
+        "is_training": True,
+        "status": "training",
+        "error": None,
+        "progress": "0%"
+    })
+
+    def set_progress(persen):
+        training_status["progress"] = f"{persen}%"
+
     try:
         from train_model import train_and_save_model
-        train_and_save_model()
-        
-        # Setelah pelatihan selesai, muat model
+        train_and_save_model(progress_callback=set_progress)
+
         if load_model():
             training_status["status"] = "completed"
         else:
             training_status["status"] = "completed_with_errors"
             training_status["error"] = "Model berhasil dilatih tetapi gagal dimuat"
-            
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -66,8 +71,8 @@ def index():
     training_info = f" (sedang dilatih)" if training_status["is_training"] else ""
     return f"API Prediksi Konsumsi Listrik RNN (Model {status}{training_info})"
 
-@app.route('/retrain', methods=['POST'])
-def retrain():
+@app.route('/train_model', methods=['POST'])
+def train_model():
     global training_status
     
     # Cek apakah model sedang dilatih

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  retrain:
+  train_model:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Call /retrain endpoint
-        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/retrain
+      - name: Call /train_model endpoint
+        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/train_model
