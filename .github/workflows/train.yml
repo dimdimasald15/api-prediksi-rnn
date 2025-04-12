@@ -11,5 +11,5 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Call /train_model endpoint
-        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/train_model
+      - name: Call /training-model endpoint
+        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/training-model

@@ -71,7 +71,7 @@ def index():
     training_info = f" (sedang dilatih)" if training_status["is_training"] else ""
     return f"API Prediksi Konsumsi Listrik RNN (Model {status}{training_info})"
 
-@app.route('/train_model', methods=['POST'])
+@app.route('/training-model', methods=['POST'])
 def train_model():
     global training_status
     
