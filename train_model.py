@@ -60,6 +60,8 @@ def train_and_save_model():
         # Gunakan scaler yang sama untuk X dan y
         x_scaler = MinMaxScaler()
         y_scaler = MinMaxScaler()
+        y = np.array(y).reshape(-1, 1)  # Data hasil windowing (sudah dikumpulkan sebelumnya)
+        y_scaled = y_scaler.fit_transform(y)
 
         # Reshape dengan aman
         X_flat = X.reshape(-1, X.shape[-1])
