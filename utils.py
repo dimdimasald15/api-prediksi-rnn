@@ -2,7 +2,6 @@
 import mysql.connector
 import pickle
 import os
-from sqlalchemy import create_engine
 
 # Database config
 db_config = {
@@ -20,9 +19,7 @@ DAYA_MIN = 2200
 DAYA_MAX = 66000
 
 def get_db_connection():
-    return create_engine(
-        "mysql+mysqlconnector://root:ThpPEjAeCkstBjBiUdtmqcqwYRGhbyKh@switchback.proxy.rlwy.net:53354/railway"
-    )
+    return mysql.connector.connect(**db_config)
 
 def save_scaler(scaler, path='scaler.pkl'):
     with open(path, 'wb') as f:
