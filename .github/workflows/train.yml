@@ -12,4 +12,4 @@ jobs:
 
     steps:
       - name: Call /train_model endpoint
-        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/train_model
+        run: curl -X POST https://api-prediksi-rnn-production.up.railway.app/retrain
