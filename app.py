@@ -8,6 +8,7 @@ app = Flask(__name__)
 app.register_blueprint(train_bp)
 app.register_blueprint(predict_bp)
 
+model = None
 model_path = 'model_rnn_konsumsi.keras'
 
 def load_model():
