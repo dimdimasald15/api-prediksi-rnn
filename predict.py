@@ -1,5 +1,5 @@
 # predict.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -150,3 +150,7 @@ def predict():
 
     except Exception as e:
         return jsonify({'error': f'Error tidak terduga: {str(e)}'}), 500
+    
+@predict_bp.route('/plot/<filename>', methods=['GET'])
+def get_plot(filename):
+    return send_from_directory('static/plots', filename)

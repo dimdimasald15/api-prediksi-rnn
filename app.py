@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify
 import os
 import threading
 import tensorflow as tf
@@ -101,10 +101,6 @@ def train_model():
 def get_training_status():
     global training_status
     return jsonify(training_status)
-
-@predict_bp.route('/plot/<filename>', methods=['GET'])
-def get_plot(filename):
-    return send_from_directory('static/plots', filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)

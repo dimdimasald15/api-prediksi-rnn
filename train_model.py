@@ -1,5 +1,5 @@
 # train_model.py
-from flask import Blueprint, jsonify
+from flask import Blueprint
 import pandas as pd
 import numpy as np
 import tensorflow as tf
