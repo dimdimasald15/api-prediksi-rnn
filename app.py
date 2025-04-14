@@ -28,6 +28,11 @@ def load_model():
     except Exception as e:
         print(f"Error loading model: {str(e)}")
         return False
+    
+def update_progress(progress):
+    global training_status
+    training_status["progress"] = f"{progress}%"
+    print(f"Progress updated: {progress}%")
 
 def train_model_thread():
     global training_status, model
@@ -48,7 +53,6 @@ def train_model_thread():
 
         if load_model():
             training_status["status"] = "completed"
-            training_status["loss_plot_url"] = "/plot/loss_plot.png"
         else:
             training_status["status"] = "completed_with_errors"
             training_status["error"] = "Model berhasil dilatih tetapi gagal dimuat"

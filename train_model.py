@@ -7,8 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from utils import get_db_connection, save_scaler, kategori_tarif_daya, one_hot_encode, scale_daya, TARIF_LIST, KATEGORI_LIST
-import matplotlib.pyplot as plt
-
+# Hapus import matplotlib.pyplot
 
 train_bp = Blueprint('train_model', __name__)
 
@@ -92,30 +91,32 @@ def train_and_save_model(progress_callback=None):
         # Update progress per epoch
         class ProgressCallback(tf.keras.callbacks.Callback):
             def on_epoch_end(self, epoch, logs=None):
-                update_progress(50 + int((epoch + 1) / self.params['epochs'] * 40))
+                progress = 50 + int((epoch + 1) / self.params['epochs'] * 40)
+                update_progress(progress)
+                # Print progress untuk debugging
+                print(f"Training progress: {progress}%")
+
+        # Tambahkan callback untuk reporting progress
+        callbacks = [ProgressCallback()]
 
         history = model.fit(
             X_scaled, y_scaled, 
             epochs=20, 
             batch_size=16, 
             verbose=1,
-            validation_split=0.2
+            validation_split=0.2,
+            callbacks=callbacks  # Tambahkan callbacks
         )
 
-        # Plot loss
-        plt.figure(figsize=(8, 5))
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss (MSE)')
-        plt.title('Training vs Validation Loss')
-        plt.legend()
-        plt.grid(True)
-
-        # Simpan gambar
-        loss_plot_path = 'static/plots/loss_plot.png'
-        plt.savefig(loss_plot_path)
-        plt.close()
+        # Hapus bagian plotting dengan matplotlib
+        # Sebagai gantinya, kita simpan history loss dalam file teks
+        try:
+            with open('static/plots/training_history.txt', 'w') as f:
+                f.write("epoch,loss,val_loss\n")
+                for i, (loss, val_loss) in enumerate(zip(history.history['loss'], history.history['val_loss'])):
+                    f.write(f"{i},{loss},{val_loss}\n")
+        except Exception as e:
+            print(f"Warning: Gagal menyimpan history: {str(e)}")
         
         update_progress(95)
 

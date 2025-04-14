@@ -4,6 +4,9 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import os
+import matplotlib
+# Set matplotlib to use non-interactive backend to avoid GUI errors
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from utils import (
     get_db_connection, load_scaler, load_y_scaler,
@@ -108,25 +111,35 @@ def predict():
         # Inverse transform hasil prediksi Y
         y_pred_array = np.array(prediksi).reshape(-1, 1)
         prediksi_asli = y_scaler.inverse_transform(y_pred_array).flatten()
-        # Visualisasi prediksi
-        plt.figure(figsize=(8, 5))
-        plt.plot(range(12), usage[-12:], label='Historis', marker='o')
-        plt.plot(range(12, 12 + jumlah_bulan), prediksi_asli, label='Prediksi', marker='o', linestyle='--')
-        plt.xlabel('Bulan ke-')
-        plt.ylabel('Pemakaian kWh')
-        plt.title(f'Prediksi Pemakaian kWh - Customer ID {customer_id}')
-        plt.legend()
-        plt.grid(True)
-
+        
         # Buat folder jika belum ada
         plot_folder = 'static/plots'
         os.makedirs(plot_folder, exist_ok=True)
-
-        # Simpan file gambar prediksi
+        
+        # Generate plot filename
         plot_filename = f'prediksi_{customer_id}_{jumlah_bulan}bulan_ke_depan.png'
         plot_path = os.path.join(plot_folder, plot_filename)
-        plt.savefig(plot_path)
-        plt.close()
+        
+        # Create a new figure with explicit figure instance to avoid memory leaks
+        fig = plt.figure(figsize=(8, 5))
+        try:
+            # Plot data
+            plt.plot(range(12), usage[-12:], label='Historis', marker='o')
+            plt.plot(range(12, 12 + jumlah_bulan), prediksi_asli, label='Prediksi', marker='o', linestyle='--')
+            plt.xlabel('Bulan ke-')
+            plt.ylabel('Pemakaian kWh')
+            plt.title(f'Prediksi Pemakaian kWh - Customer ID {customer_id}')
+            plt.legend()
+            plt.grid(True)
+            
+            # Simpan file gambar prediksi
+            fig.savefig(plot_path)
+        except Exception as plot_error:
+            # Log the specific plotting error
+            print(f"Error plotting: {str(plot_error)}")
+        finally:
+            # Always close the figure to release memory
+            plt.close(fig)
 
         return jsonify({
             'customer_id': customer_id,
