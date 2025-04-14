@@ -57,7 +57,7 @@ def predict():
             ORDER BY tahun, bulan DESC
             LIMIT 12
         """
-         with engine.connect() as conn:
+        with engine.connect() as conn:
             df_usage = pd.read_sql(query_usage, conn)
 
         if df_usage.empty:
