@@ -47,22 +47,29 @@ def predict():
         y_scaler = load_y_scaler(y_scaler_path)
 
         # Ambil data dari DB
-        conn = get_db_connection()
+        engine = get_db_connection()
+        if not engine:
+            raise Exception("Koneksi database gagal")
+        
         query_usage = f"""
             SELECT pemakaian_kwh FROM consumptions
             WHERE customer_id = {customer_id}
             ORDER BY tahun, bulan DESC
             LIMIT 12
         """
-        df_usage = pd.read_sql(query_usage, conn)
+         with engine.connect() as conn:
+            df_usage = pd.read_sql(query_usage, conn)
 
+        if df_usage.empty:
+            raise Exception("Data pemakaian tidak ditemukan")
+        
         query_customer = f"""
             SELECT tarif, daya, kategori FROM customers
             WHERE id = {customer_id}
         """
-        df_customer = pd.read_sql(query_customer, conn)
-        conn.close()
-
+        with engine.connect() as conn:
+            df_customer = pd.read_sql(query_customer, conn)
+        
         if df_customer.empty:
             return jsonify({'error': f'Customer dengan ID {customer_id} tidak ditemukan'}), 404
         if len(df_usage) < 12:
