@@ -7,6 +7,8 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from utils import get_db_connection, save_scaler, kategori_tarif_daya, one_hot_encode, scale_daya, TARIF_LIST, KATEGORI_LIST
+import matplotlib.pyplot as plt
+
 
 train_bp = Blueprint('train_model', __name__)
 
@@ -92,7 +94,29 @@ def train_and_save_model(progress_callback=None):
             def on_epoch_end(self, epoch, logs=None):
                 update_progress(50 + int((epoch + 1) / self.params['epochs'] * 40))
 
-        model.fit(X_scaled, y_scaled, epochs=20, batch_size=16, verbose=1)
+        history = model.fit(
+            X_scaled, y_scaled, 
+            epochs=20, 
+            batch_size=16, 
+            verbose=1,
+            validation_split=0.2
+        )
+
+        # Plot loss
+        plt.figure(figsize=(8, 5))
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss (MSE)')
+        plt.title('Training vs Validation Loss')
+        plt.legend()
+        plt.grid(True)
+
+        # Simpan gambar
+        loss_plot_path = 'static/plots/loss_plot.png'
+        plt.savefig(loss_plot_path)
+        plt.close()
+        
         update_progress(95)
 
         model.save('model_rnn_konsumsi.keras')

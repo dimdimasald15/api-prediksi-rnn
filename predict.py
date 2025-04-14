@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 from utils import (
     get_db_connection, load_scaler, load_y_scaler,
     kategori_tarif_daya, one_hot_encode, scale_daya,
@@ -107,11 +108,31 @@ def predict():
         # Inverse transform hasil prediksi Y
         y_pred_array = np.array(prediksi).reshape(-1, 1)
         prediksi_asli = y_scaler.inverse_transform(y_pred_array).flatten()
+        # Visualisasi prediksi
+        plt.figure(figsize=(8, 5))
+        plt.plot(range(12), usage[-12:], label='Historis', marker='o')
+        plt.plot(range(12, 12 + jumlah_bulan), prediksi_asli, label='Prediksi', marker='o', linestyle='--')
+        plt.xlabel('Bulan ke-')
+        plt.ylabel('Pemakaian kWh')
+        plt.title(f'Prediksi Pemakaian kWh - Customer ID {customer_id}')
+        plt.legend()
+        plt.grid(True)
+
+        # Buat folder jika belum ada
+        plot_folder = 'static/plots'
+        os.makedirs(plot_folder, exist_ok=True)
+
+        # Simpan file gambar prediksi
+        plot_filename = f'prediksi_{customer_id}_{jumlah_bulan}bulan_ke_depan.png'
+        plot_path = os.path.join(plot_folder, plot_filename)
+        plt.savefig(plot_path)
+        plt.close()
 
         return jsonify({
             'customer_id': customer_id,
             'jumlah_bulan': jumlah_bulan,
-            'prediksi_kwh': [round(float(p), 2) for p in prediksi_asli]
+            'plot_filename': plot_filename,
+            'prediksi_kwh': [round(float(p), 2) for p in prediksi_asli],
         })
 
     except Exception as e:

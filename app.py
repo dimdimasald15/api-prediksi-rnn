@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 import os
 import threading
 import tensorflow as tf
@@ -48,6 +48,7 @@ def train_model_thread():
 
         if load_model():
             training_status["status"] = "completed"
+            training_status["loss_plot_url"] = "/plot/loss_plot.png"
         else:
             training_status["status"] = "completed_with_errors"
             training_status["error"] = "Model berhasil dilatih tetapi gagal dimuat"
@@ -96,6 +97,10 @@ def train_model():
 def get_training_status():
     global training_status
     return jsonify(training_status)
+
+@predict_bp.route('/plot/<filename>', methods=['GET'])
+def get_plot(filename):
+    return send_from_directory('static/plots', filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
