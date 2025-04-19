@@ -2,7 +2,7 @@ from flask import Blueprint
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, LSTM, Dense, Concatenate, RepeatVector
 from sklearn.preprocessing import MinMaxScaler
 from utils import (
