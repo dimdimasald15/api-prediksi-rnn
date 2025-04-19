@@ -2,8 +2,8 @@ from flask import Blueprint
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Input, LSTM, Dense, Concatenate, RepeatVector
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
 from sklearn.preprocessing import MinMaxScaler
 from utils import (
     get_db_connection,
@@ -95,26 +95,11 @@ def train_and_save_model(progress_callback=None):
         update_progress(50)
 
         # Step 5: Definisikan model LSTM
-        # Input sequence: 12 bulan terakhir konsumsi
-        input_seq = Input(shape=(12, 1), name="input_seq")
-
-        # Fitur statis: tarif, daya, kategori (total 12 dimensi mungkin)
-        input_static = Input(shape=(12,), name="input_static")
-
-        # LSTM branch
-        x = LSTM(64, activation='tanh')(input_seq)
-
-        # Static input dipakai di setiap timestep (ulangi 12x)
-        static_repeated = RepeatVector(1)(input_static)
-
-        # Gabung LSTM dan fitur statis
-        combined = Concatenate()([x, static_repeated[:, 0, :]])  # ambil hanya 1 langkah
-
-        output = Dense(1, name="output")(combined)
-
-        model = Model(inputs=[input_seq, input_static], outputs=output)
+        model = Sequential([
+            LSTM(64, activation='relu', input_shape=(12, X.shape[2])),
+            Dense(1)
+        ])
         model.compile(optimizer='adam', loss='mse')
-        model.summary()
 
         # Progress callback per epoch
         class ProgressCallback(tf.keras.callbacks.Callback):
