@@ -30,6 +30,7 @@ def predict():
             return jsonify({'error': 'Body request kosong'}), 400
             
         customer_id = data.get('customer_id')
+        customer_nama = data.get('nama')
         if not customer_id:
             return jsonify({'error': 'customer_id tidak disediakan'}), 400
             
@@ -68,11 +69,9 @@ def predict():
             raise Exception("Data pemakaian tidak ditemukan")
         
         query_customer = f"""
-            SELECT nama, tarif, daya, kategori FROM customers
+            SELECT tarif, daya, kategori FROM customers
             WHERE id = {customer_id}
         """
-        customer_name = query_customer['nama'].values[0].upper()
-
         with engine.connect() as conn:
             df_customer = pd.read_sql(query_customer, conn)
         
@@ -130,7 +129,7 @@ def predict():
             plt.plot(range(12, 12 + jumlah_bulan), prediksi_asli, label='Prediksi', marker='o', linestyle='--')
             plt.xlabel('Bulan ke-')
             plt.ylabel('Pemakaian kWh')
-            plt.title(f'Prediksi Pemakaian kWh - Bapak/Ibu {customer_name}')
+            plt.title(f'Prediksi Pemakaian kWh - Customer ID {customer_nama}')
             plt.legend()
             plt.grid(True)
             
