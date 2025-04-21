@@ -55,7 +55,7 @@ def predict():
             raise Exception("Koneksi database gagal")
         
         query_usage = f"""
-            SELECT pemakaian_kwh FROM consumptions
+            SELECT bulan, tahun, pemakaian_kwh FROM consumptions
             WHERE customer_id = {customer_id}
             ORDER BY tahun, bulan DESC
             LIMIT 12
@@ -110,7 +110,7 @@ def predict():
         os.makedirs(plot_folder, exist_ok=True)
 
         # Generate plot filename
-        plot_filename = f'2_prediksi_CustomerId {customer_id}_{jumlah_bulan} bulan_ke_depan.png'
+        plot_filename = f'prediksi_CustomerId {customer_id}_{jumlah_bulan} bulan_ke_depan.png'
         plot_path = os.path.join(plot_folder, plot_filename)
 
         # Prepare x-axis labels for historical data
