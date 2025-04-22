@@ -57,7 +57,7 @@ def predict():
         query_usage = f"""
             SELECT bulan, tahun, pemakaian_kwh FROM consumptions
             WHERE customer_id = {customer_id}
-            ORDER BY tahun, bulan DESC
+            ORDER BY tahun DESC, bulan DESC
             LIMIT 12
         """
         with engine.connect() as conn:
