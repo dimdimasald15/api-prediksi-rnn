@@ -1,13 +1,16 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 import os
 import threading
 import tensorflow as tf
 from train_model import train_bp
 from predict import predict_bp
+from predict_batch import predict_batch_bp
+
 
 app = Flask(__name__)
 app.register_blueprint(train_bp)
 app.register_blueprint(predict_bp)
+app.register_blueprint(predict_batch_bp)
 
 model = None
 model_path = 'model_rnn_konsumsi.keras'
@@ -101,6 +104,10 @@ def train_model():
 def get_training_status():
     global training_status
     return jsonify(training_status)
+
+@app.route('/plot/<filename>', methods=['GET'])
+def get_plot(filename):
+    return send_from_directory('static/plots', filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
