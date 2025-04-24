@@ -5,6 +5,7 @@ import tensorflow as tf
 from train_model import train_bp
 from predict import predict_bp
 from predict_batch import predict_batch_bp
+from utils import PLOT_FOLDER
 
 
 app = Flask(__name__)
@@ -107,7 +108,20 @@ def get_training_status():
 
 @app.route('/plot/<filename>', methods=['GET'])
 def get_plot(filename):
-    return send_from_directory('static/plots', filename)
+    return send_from_directory(PLOT_FOLDER, filename)
+
+@app.route('/delete-plot/<filename>', methods=['DELETE'])
+def delete_plot(filename):
+    file_path = os.path.join(PLOT_FOLDER, filename)
+    
+    if not os.path.exists(file_path):
+        return jsonify({"message": "File tidak ditemukan"}), 404
+
+    try:
+        os.remove(file_path)
+        return jsonify({"message": f"File {filename} berhasil dihapus"}), 200
+    except Exception as e:
+        return jsonify({"message": "Gagal menghapus file", "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
