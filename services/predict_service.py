@@ -2,45 +2,65 @@
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+from pandas import isna
 import os
-import matplotlib.pyplot as plt
+import logging
+import json
+
 from utils import (
-    MODEL_PATH, X_SCALER_PATH, Y_SCALER_PATH, PLOT_FOLDER,
+    MODEL_PATH, X_SCALER_PATH, Y_SCALER_PATH,
     get_db_connection, load_scaler)
+from helper.redis_helper import redis_client, redis_connection_required
+from helper.generate_plot_helper import generate_plot
 
-os.makedirs(PLOT_FOLDER, exist_ok=True)
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Nonaktifkan GPU
 
-def predict_customer(customer_id, nama, jumlah_bulan):
+def load_model():
+    # Tambahkan config untuk CPU saja
+    tf.config.set_visible_devices([], 'GPU')
+    return tf.keras.models.load_model(MODEL_PATH)
+
+def predict_customer(customer_id, jumlah_bulan, prefetched_data=None):
     if not os.path.exists(MODEL_PATH) or not os.path.exists(X_SCALER_PATH) or not os.path.exists(Y_SCALER_PATH):
         raise FileNotFoundError("Model atau scaler tidak ditemukan")
 
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model = load_model()
     x_scaler = load_scaler(X_SCALER_PATH)
     y_scaler = load_scaler(Y_SCALER_PATH)
 
-    engine = get_db_connection()
-    query_usage = f"""
-        SELECT bulan, tahun, pemakaian_kwh FROM consumptions
-        WHERE customer_id = {customer_id}
-        ORDER BY tahun DESC, bulan DESC
-        LIMIT 12
-    """
-    with engine.connect() as conn:
-        df_usage = pd.read_sql(query_usage, conn)
+    # Gunakan data hasil prefetch jika tersedia
+    if prefetched_data is not None:
+        df_customer = prefetched_data.get('customer')
+        df_usage = prefetched_data.get('consumptions')
 
-    if df_usage.empty or len(df_usage) < 12:
-        raise ValueError("Data historis tidak mencukupi")
+        if df_customer is None or df_usage is None or df_usage.empty or len(df_usage) < 12:
+            raise ValueError(f"Data tidak lengkap untuk customer_id {customer_id} (prefetched)")
+    else:
+        # Fetch dari database jika data belum diprefetch
+        engine = get_db_connection()
+        query_usage = f"""
+            SELECT bulan, tahun, pemakaian_kwh FROM consumptions
+            WHERE customer_id = {customer_id}
+            ORDER BY tahun DESC, bulan DESC
+            LIMIT 12
+        """
+        with engine.connect() as conn:
+            df_usage = pd.read_sql(query_usage, conn)
 
-    query_customer = f"""
-        SELECT tarif, daya, kategori FROM customers
-        WHERE id = {customer_id}
-    """
-    with engine.connect() as conn:
-        df_customer = pd.read_sql(query_customer, conn)
+        if df_usage.empty or len(df_usage) < 12:
+            raise ValueError("Data historis tidak mencukupi")
 
-    if df_customer.empty:
-        raise ValueError("Customer tidak ditemukan")
+        query_customer = f"""
+            SELECT nama, tarif, daya, kategori FROM customers
+            WHERE id = {customer_id}
+        """
+        with engine.connect() as conn:
+            df_customer = pd.read_sql(query_customer, conn)
 
+        if df_customer.empty:
+            raise ValueError("Customer tidak ditemukan")
+
+    nama = df_customer.iloc[0]['nama']
     usage = df_usage['pemakaian_kwh'].values[::-1]
     bulan = df_usage['bulan'].values[::-1]
     tahun = df_usage['tahun'].values[::-1]
@@ -61,7 +81,7 @@ def predict_customer(customer_id, nama, jumlah_bulan):
 
     y_pred_array = np.array(prediksi).reshape(-1, 1)
     prediksi_asli = y_scaler.inverse_transform(y_pred_array).flatten()
-    # gambar plot
+
     plot_filename = generate_plot(
         customer_id=customer_id,
         nama=nama,
@@ -80,47 +100,132 @@ def predict_customer(customer_id, nama, jumlah_bulan):
         'plot_filename': plot_filename
     }
 
-def generate_plot(customer_id, nama, usage, bulan, tahun, prediksi_asli, jumlah_bulan):
-    plot_filename = f'prediksi_CustomerId_{customer_id}_{jumlah_bulan}_bulan.png'
-    plot_path = os.path.join(PLOT_FOLDER, plot_filename)
-
-    # Generate label untuk X axis
-    x_labels_hist = [f"{b}/{t}" for b, t in zip(bulan[-12:], tahun[-12:])]
-    pred_months = []
-    next_month = bulan[-1]
-    next_year = tahun[-1]
-
-    for _ in range(jumlah_bulan):
-        next_month += 1
-        if next_month > 12:
-            next_month = 1
-            next_year += 1
-        pred_months.append(f"{next_month}/{next_year}")
-
-    all_labels = x_labels_hist + pred_months
-
-    fig = plt.figure(figsize=(10, 5))
+#services/predict_services.py
+@redis_connection_required
+def update_progress(batch_id, processed, total):
+    """Update progress dengan atomic operation"""
     try:
-        plt.plot(range(12), usage[-12:], label='Historis', marker='o')
-        pred_line = plt.plot(range(12, 12 + jumlah_bulan), prediksi_asli, label='Prediksi', 
-                    marker='o', linestyle='--')
-        pred_color = pred_line[0].get_color()
-        plt.plot([11, 12], [usage[-1], prediksi_asli[0]], linestyle='--', color=pred_color)
-        plt.xticks(range(12 + jumlah_bulan), all_labels, rotation=45)
+        progress_data = {
+            'processed': processed,
+            'total': total,
+            'percentage': int((processed / total) * 100) if total > 0 else 0
+        }
+        redis_client.setex(
+            f"prediction:{batch_id}:progress",
+            3600,  # 1 jam expiry
+            json.dumps(progress_data)
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Failed to update progress: {str(e)}")
+        return False
 
-        ax = plt.gca()
-        for i in range(jumlah_bulan):
-            ax.get_xticklabels()[i + 12].set_color(pred_color)
+# Prefetch data untuk multiple customers
+def get_customers_data(customer_ids):
+    engine = get_db_connection()
+    placeholders = ', '.join(['%s'] * len(customer_ids))
+    query = f"""
+        SELECT 
+            c.id as customer_id, 
+            c.nama, 
+            c.tarif, 
+            c.daya, 
+            c.kategori,
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'bulan', cons_sorted.bulan,
+                    'tahun', cons_sorted.tahun,
+                    'pemakaian_kwh', cons_sorted.pemakaian_kwh
+                )
+            ) AS consumptions
+        FROM customers c
+        LEFT JOIN (
+            SELECT * FROM consumptions
+            ORDER BY tahun DESC, bulan DESC
+        ) AS cons_sorted ON cons_sorted.customer_id = c.id
+        WHERE c.id IN ({placeholders})
+        GROUP BY c.id, c.nama, c.tarif, c.daya, c.kategori
+        ORDER BY c.id
+    """
+    
+    with engine.connect() as conn:
+        return pd.read_sql(query, conn, params=tuple(customer_ids))
 
-        plt.xlabel('Bulan/Tahun')
-        plt.ylabel('Pemakaian kWh')
-        plt.title(f'Prediksi Pemakaian Listrik {nama.upper()} \nDalam {jumlah_bulan} Bulan Ke Depan')
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        fig.savefig(plot_path)
-    finally:
-        plt.close(fig)
+def predict_batch_results(customerIds, batch_id, jumlah_bulan):
+    if not customerIds:
+        return {'error': 'Daftar customer_ids tidak boleh kosong', 'results': []}
+    
+    results = []
+    total = len(customerIds)
+    chunk_size = max(1, len(customerIds) // 10)  # Minimal 1 per chunk
+    
+    try:
+        # Bagi customerIds menjadi chunk
+        chunks = [customerIds[i:i + chunk_size] for i in range(0, total, chunk_size)]
+        processed_count = 0
+        for i, chunk in enumerate(chunks):            
+            try:
+                df = get_customers_data(chunk)
+                
+                for _, row in df.iterrows():
+                    try:
+                        consumptions_data = row['consumptions']
+                        # Tambahkan ini untuk memastikan bentuknya:
+                        print("DEBUG - customer:", row['customer_id'],  row['consumptions'])
 
-    return plot_filename
+                        if isinstance(consumptions_data, str):
+                            try:
+                                consumptions_data = json.loads(consumptions_data)
+                            except json.JSONDecodeError:
+                                logger.warning(f"customer_id {row['customer_id']}: Field 'consumptions' tidak bisa di-decode sebagai JSON")
+                                continue
 
+                        # Validasi apakah hasil parsing benar-benar list
+                        if not isinstance(consumptions_data, list):
+                            logger.warning(f"Prediction failed for customer_id {row['customer_id']}: Field 'consumptions' tidak berbentuk list yang valid")
+                            continue
+                        
+                        consumptions = pd.DataFrame(consumptions_data)
+                        print("DEBUG - consumptions:", consumptions)
+
+                        if consumptions.empty or len(consumptions) < 12:
+                            raise ValueError("Data historis kurang dari 12 bulan")
+
+                        consumptions.sort_values(['tahun', 'bulan'], ascending=[False, False], inplace=True)
+
+                        prefetched_data = {
+                            'customer': row.to_frame().T,
+                            'consumptions': consumptions
+                        }
+
+                        result = predict_customer(
+                            customer_id=row['customer_id'],
+                            jumlah_bulan=jumlah_bulan,
+                            prefetched_data=prefetched_data
+                        )
+                        results.append(result)
+
+                    except Exception as e:
+                        logging.warning(f"Prediction failed for customer_id {row.get('customer_id', 'UNKNOWN')}: {str(e)}")
+                        continue
+                    
+                    processed_count += 1
+                    update_progress(batch_id, processed_count, total)
+                   
+            except Exception as e:
+                logging.error(f"Error processing chunk {i}: {str(e)}")
+                continue
+                
+        return {
+            'success': True,
+            'processed_count': len(results),
+            'results': results
+        }
+        
+    except Exception as e:
+        logging.error(f"Batch prediction failed: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'results': results
+        }
