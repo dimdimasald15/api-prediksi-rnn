@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, send_from_directory
+import logging
+from flask import Flask, jsonify, send_from_directory, request
 import os
 import threading
 import tensorflow as tf
@@ -23,6 +24,10 @@ training_status = {
     "error": None,
     "progress": "0%"
 }
+
+
+# Konfigurasi logging
+logging.basicConfig(filename='error.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def load_model():
     global model
@@ -108,7 +113,15 @@ def get_training_status():
 
 @app.route('/plot/<filename>', methods=['GET'])
 def get_plot(filename):
-    return send_from_directory(PLOT_FOLDER, filename)
+    try:
+        return send_from_directory(PLOT_FOLDER, filename)
+    except FileNotFoundError:
+        logging.error(f"File not found: {filename} - Request from {request.remote_addr}")
+        return "File not found", 404
+    except Exception as e:
+        logging.exception(f"Error during file request: {e} - Request from {request.remote_addr}") # Log detail error
+        return "Internal Server Error", 500
+
 
 @app.route('/delete-plot/<filename>', methods=['DELETE'])
 def delete_plot(filename):
