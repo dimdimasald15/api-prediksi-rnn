@@ -20,11 +20,11 @@ class RedisClient:
         try:
             # Konfigurasi dari environment variables
             self.client = redis.Redis(
-                host='redis-13719.c82.us-east-1-2.ec2.redns.redis-cloud.com',
-                port=13719,
-                username="default",
-                password="9cLBr2yAfpQKCZZR7dDAlIb7zflDc1XI",
+                host='redis-12766.c61.us-east-1-3.ec2.redns.redis-cloud.com',
+                port=12766,
                 decode_responses=True,
+                username="default",
+                password="6bOyGhuYME9kUfyNFegzl8WDhkK4XPB5",
                 socket_timeout=10,
                 socket_connect_timeout=5,
                 retry_on_timeout=True

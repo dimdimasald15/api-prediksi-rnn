@@ -9,13 +9,17 @@ from utils import (
     get_db_connection,
     save_scaler
 )
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import matplotlib.pyplot as plt
+import os
+import json
 
 train_bp = Blueprint('train_model', __name__)
 
 def train_and_save_model(progress_callback=None):
-    def update_progress(persen):
+    def update_progress(persen, epoch=None, total_epochs=None, loss=None, val_loss=None):
         if progress_callback:
-            progress_callback(persen)
+            progress_callback(persen, epoch, total_epochs, loss, val_loss)
 
     try:
         update_progress(0)
@@ -86,9 +90,15 @@ def train_and_save_model(progress_callback=None):
         # Progress callback per epoch
         class ProgressCallback(tf.keras.callbacks.Callback):
             def on_epoch_end(self, epoch, logs=None):
-                progress = 50 + int((epoch + 1) / self.params['epochs'] * 40)
-                update_progress(progress)
-                print(f"Training progress: {progress}%")
+                progress_on_training = 50 + int((epoch + 1) / self.params['epochs'] * 40)
+                update_progress(
+                    progress_on_training,
+                    epoch=epoch + 1, # epoch dimulai dari 0, tambahkan 1 untuk display
+                    total_epochs=self.params['epochs'],
+                    loss=logs.get('loss'),
+                    val_loss=logs.get('val_loss')
+                )
+                print(f"Epoch {epoch+1}/{self.params['epochs']} - Loss: {logs.get('loss'):.4f}, Val Loss: {logs.get('val_loss'):.4f}")
 
         # Step 5: Training
         history = model.fit(
@@ -100,7 +110,56 @@ def train_and_save_model(progress_callback=None):
             callbacks=[ProgressCallback()],
             verbose=1
         )
+        
+        update_progress(90) 
+        # Step 6: Evaluasi model
+        print("\n--- Mengevaluasi Model ---")
+        # 1. Melakukan Prediksi pada Data Skala
+        y_pred_scaled = model.predict(X_scaled)
 
+        # 2. Mengembalikan Prediksi dan Nilai Sebenarnya ke Skala Asli
+        y_pred = y_scaler.inverse_transform(y_pred_scaled)
+        y_true = y_scaler.inverse_transform(y_scaled)
+
+        # 3. Menghitung Metrik
+        mae = mean_absolute_error(y_true, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
+        rmse = np.sqrt(mse) # RMSE adalah akar kuadrat dari MSE
+
+        evaluation_metrics = {
+            "mae": float(mae),
+            "mse": float(mse),
+            "rmse": float(rmse)
+        }
+
+        print(f"MAE: {mae:.2f}")
+        print(f"MSE: {mse:.2f}")
+        print(f"RMSE: {rmse:.2f}")
+        
+        # Pastikan direktori untuk menyimpan plot ada
+        plots_dir = 'static/plots/train_model'
+        os.makedirs(plots_dir, exist_ok=True)
+
+        # 4. Menyimpan Metrik ke File JSON
+        metrics_file_path = os.path.join(plots_dir, 'model_metrics.json')
+        with open(metrics_file_path, 'w') as f:
+            json.dump(evaluation_metrics, f, indent=4)
+        print(f"Metrik disimpan ke: {metrics_file_path}")
+
+        # 5. Visualisasi Prediksi vs Aktual (dan menyimpan sebagai gambar)
+        plt.figure(figsize=(12, 6))
+        plt.plot(y_true, label='Actual Values', color='blue', alpha=0.7)
+        plt.plot(y_pred, label='Predicted Values', color='red', linestyle='--', alpha=0.7)
+        plt.title('Actual vs Predicted Consumption (Training Data)')
+        plt.xlabel('Data Point Index')
+        plt.ylabel('Pemakaian KWH')
+        plt.legend()
+        plt.grid(True)
+        plot_path = os.path.join(plots_dir, 'actual_vs_predicted.png')
+        plt.savefig(plot_path)
+        plt.close() # Penting untuk menutup plot agar tidak memakan memori
+        print(f"Plot Actual vs Predicted disimpan ke: {plot_path}")
+        
         # Step 6: Simpan hasil training ke file (jika diperlukan)
         try:
             with open('static/plots/training_history.txt', 'w') as f:

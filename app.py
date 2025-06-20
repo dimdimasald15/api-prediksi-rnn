@@ -1,6 +1,7 @@
 import logging
 from flask import Flask, jsonify, send_from_directory, request
 import os
+import json
 import threading
 import tensorflow as tf
 from train_model import train_bp
@@ -22,7 +23,11 @@ training_status = {
     "is_training": False,
     "status": "idle",
     "error": None,
-    "progress": "0%"
+     "progress": "0%",
+    "current_epoch": 0,
+    "total_epochs": 0,
+    "current_loss": None,
+    "current_val_loss": None
 }
 
 
@@ -38,10 +43,34 @@ def load_model():
         print(f"Error loading model: {str(e)}")
         return False
     
-def update_progress(progress):
+def update_training_status_callback(
+    progress_percent,
+    epoch=None,
+    total_epochs=None,
+    loss=None,
+    val_loss=None
+):
     global training_status
-    training_status["progress"] = f"{progress}%"
-    print(f"Progress updated: {progress}%")
+    
+    training_status["progress"] = f"{progress_percent}%"
+    
+    if epoch is not None:
+        training_status["current_epoch"] = epoch
+    if total_epochs is not None:
+        training_status["total_epochs"] = total_epochs
+    if loss is not None:
+        training_status["current_loss"] = float(loss) # Konversi ke float untuk JSON
+    if val_loss is not None:
+        training_status["current_val_loss"] = float(val_loss) # Konversi ke float untuk JSON
+        
+    loss_str = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
+    val_loss_str = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"
+
+    print(f"Training Progress: {training_status['progress']} | "
+          f"Epoch: {training_status['current_epoch']}/{training_status['total_epochs']} | "
+          f"Loss: {loss_str} | "
+          f"Val Loss: {val_loss_str}")
+
 
 def train_model_thread():
     global training_status, model
@@ -50,7 +79,11 @@ def train_model_thread():
         "is_training": True,
         "status": "training",
         "error": None,
-        "progress": "0%"
+        "progress": "0%",
+        "current_epoch": 0, # Reset saat training dimulai
+        "total_epochs": 0,  # Akan diisi dari train_and_save_model
+        "current_loss": None,
+        "current_val_loss": None
     })
 
     def set_progress(persen):
@@ -58,7 +91,7 @@ def train_model_thread():
 
     try:
         from train_model import train_and_save_model
-        train_and_save_model(progress_callback=set_progress)
+        train_and_save_model(progress_callback=update_training_status_callback)
 
         if load_model():
             training_status["status"] = "completed"
@@ -70,6 +103,7 @@ def train_model_thread():
         error_trace = traceback.format_exc()
         print(f"Error in training thread: {str(e)}")
         print(error_trace)
+        logging.error(f"Error in training thread: {str(e)}\n{error_trace}") # Log error lengkap
         training_status["status"] = "failed"
         training_status["error"] = str(e)
     finally:
@@ -106,6 +140,20 @@ def train_model():
         "status": training_status["status"]
     }), 202  # 202 Accepted
 
+@app.route('/model-metrics', methods=['GET']) # Tambahkan ini jika belum ada
+def get_model_metrics():
+    metrics_file_path = os.path.join(PLOT_FOLDER, 'train_model/model_metrics.json')
+    if os.path.exists(metrics_file_path):
+        try:
+            with open(metrics_file_path, 'r') as f:
+                metrics = json.load(f)
+            return jsonify(metrics), 200
+        except json.JSONDecodeError:
+            return jsonify({"error": "Failed to read model metrics file."}), 500
+    else:
+        return jsonify({"message": "Model metrics not found. Train the model first."}), 404
+
+
 @app.route('/training-status', methods=['GET'])
 def get_training_status():
     global training_status
@@ -122,7 +170,6 @@ def get_plot(filename):
         logging.exception(f"Error during file request: {e} - Request from {request.remote_addr}") # Log detail error
         return "Internal Server Error", 500
 
-
 @app.route('/delete-plot/<filename>', methods=['DELETE'])
 def delete_plot(filename):
     file_path = os.path.join(PLOT_FOLDER, filename)
@@ -137,4 +184,4 @@ def delete_plot(filename):
         return jsonify({"message": "Gagal menghapus file", "error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
