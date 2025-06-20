@@ -17,17 +17,10 @@ db_config = {
     'host': 'localhost',
     'port': 3306,
     'database': 'dbprediction'
-    'password': '',
-    'host': 'localhost',
-    'port': 3306,
-    'database': 'dbprediction'
 }
 
 def get_db_connection():
     return create_engine(
-        f"mysql+mysqlconnector://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}",
-        connect_args={"connect_timeout": 20},
-        pool_pre_ping=True
         f"mysql+mysqlconnector://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}",
         connect_args={"connect_timeout": 20},
         pool_pre_ping=True
