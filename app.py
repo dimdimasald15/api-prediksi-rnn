@@ -183,5 +183,15 @@ def delete_plot(filename):
     except Exception as e:
         return jsonify({"message": "Gagal menghapus file", "error": str(e)}), 500
 
+@app.route('/training-history', methods=['GET'])
+def get_training_history():
+    from train_model import get_training_history_data
+    data, error_message, status_code = get_training_history_data()
+
+    if error_message:
+        return jsonify({'error': error_message}), status_code
+    
+    return jsonify({'training_history': data}), 200
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)

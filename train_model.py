@@ -162,7 +162,7 @@ def train_and_save_model(progress_callback=None):
         
         # Step 6: Simpan hasil training ke file (jika diperlukan)
         try:
-            with open('static/plots/training_history.txt', 'w') as f:
+            with open('static/plots/training_history.csv', 'w') as f:
                 f.write("epoch,loss,val_loss\n")
                 for i, (loss, val_loss) in enumerate(zip(history.history['loss'], history.history['val_loss'])):
                     f.write(f"{i},{loss},{val_loss}\n")
@@ -181,3 +181,21 @@ def train_and_save_model(progress_callback=None):
 
     except Exception as e:
         raise Exception(f"Error pada train_model: {str(e)}")
+    
+def get_training_history_data():
+    csv_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), # Dapatkan path direktori saat ini (tempat app.py berada)
+        'static', 'plots', 'training_history.csv'
+    )
+    
+    if not os.path.exists(csv_path):
+        return None, "File training_history.csv tidak ditemukan.", 404
+    
+    try:
+        # Baca CSV menggunakan pandas
+        df = pd.read_csv(csv_path)
+        # Konversi DataFrame ke format list of dictionaries untuk JSON response
+        data = df.to_dict(orient='records')
+        return data, None, 200
+    except Exception as e:
+        return None, f"Gagal membaca data training: {str(e)}", 500
