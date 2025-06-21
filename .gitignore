@@ -1,0 +1,18 @@
+**/__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# IDE and editor files
+.vscode/
+
+# Machine Learning generated files
+# Model files
+*.keras
+*.h5
+*.pkl # For scaler.pkl, scaler_y.pkl
+
+# Generated plots
+static/plots/
+!static/plots/.gitkeep
