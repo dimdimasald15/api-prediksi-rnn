@@ -60,30 +60,23 @@ def update_training_status_callback(
     if total_epochs is not None:
         training_status["total_epochs"] = total_epochs
     if loss is not None:
-        training_status["current_loss"] = float(loss) # Konversi ke float untuk JSON
+        training_status["current_loss"] = f"{float(loss):.4e}"
     if val_loss is not None:
-        training_status["current_val_loss"] = float(val_loss) # Konversi ke float untuk JSON
+        training_status["current_val_loss"] = f"{float(val_loss):.4e}"
     
-    if progress_percent < 50:
-        training_status["status"] = f"Persiapan data & model..."
+    if progress_percent == 100 :
+        training_status["status"] = f"Training model Selesai"
     elif training_status["current_epoch"] > 0:
-        # loss_display = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
-        # val_loss_display = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"
         training_status["status"] = f"Sedang Melakukan Training model..."
-        # training_status["status"] = (
-        #     f"Epoch {training_status['current_epoch']}/{training_status['total_epochs']} "
-        #     f"(Loss: {loss_display}, Val Loss: {val_loss_display})"
-        # )
-    else: # Untuk progress antara 50% dan sebelum epoch pertama
+    elif progress_percent < 50:
+        training_status["status"] = f"Persiapan data & model..."
+    else:
         training_status["status"] = f"Memulai training model..."
     
-    loss_str = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
-    val_loss_str = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"
-
     print(f"Training Progress: {training_status['progress']} | "
-          f"Epoch: {training_status['current_epoch']}/{training_status['total_epochs']} | "
-          f"Loss: {loss_str} | "
-          f"Val Loss: {val_loss_str}")
+        f"Epoch: {training_status['current_epoch']}/{training_status['total_epochs']} | "
+        f"Loss: {training_status['current_loss'] if training_status['current_loss'] is not None else 'N/A'} | "
+        f"Val Loss: {training_status['current_val_loss'] if training_status['current_val_loss'] is not None else 'N/A'}")
 
 def train_model_thread():
     global training_status, model
@@ -181,6 +174,20 @@ def get_plot(filename):
         return "File not found", 404
     except Exception as e:
         logging.exception(f"Error during file request: {e} - Request from {request.remote_addr}") # Log detail error
+        return "Internal Server Error", 500
+
+@app.route('/plot-train-result', methods=['GET'])
+def get_plot_train_result():
+    filename = "actual_vs_predicted.png"
+    subdirectory = 'train_model' 
+    full_plot_directory = os.path.join(PLOT_FOLDER, subdirectory)
+    try:
+        return send_from_directory(full_plot_directory, filename)
+    except FileNotFoundError:
+        logging.error(f"File not found: {os.path.join(full_plot_directory, filename)} - Request from {request.remote_addr}")
+        return "File not found", 404
+    except Exception as e:
+        logging.exception(f"Error during file request for {filename}: {e} - Request from {request.remote_addr}")
         return "Internal Server Error", 500
 
 @app.route('/delete-plot/<filename>', methods=['DELETE'])

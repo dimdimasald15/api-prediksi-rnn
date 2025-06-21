@@ -10,6 +10,8 @@ from utils import (
     save_scaler
 )
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+import matplotlib
+matplotlib.use('Agg') # Ini harus sebelum import pyplot
 import matplotlib.pyplot as plt
 import os
 import json
