@@ -65,16 +65,17 @@ def update_training_status_callback(
         training_status["current_val_loss"] = float(val_loss) # Konversi ke float untuk JSON
     
     if progress_percent < 50:
-        training_status["status"] = f"Persiapan data & model... ({training_status['progress']})"
+        training_status["status"] = f"Persiapan data & model..."
     elif training_status["current_epoch"] > 0:
-        loss_display = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
-        val_loss_display = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"
-        training_status["status"] = (
-            f"Epoch {training_status['current_epoch']}/{training_status['total_epochs']} "
-            f"(Loss: {loss_display}, Val Loss: {val_loss_display})"
-        )
+        # loss_display = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
+        # val_loss_display = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"
+        training_status["status"] = f"Sedang Melakukan Training model..."
+        # training_status["status"] = (
+        #     f"Epoch {training_status['current_epoch']}/{training_status['total_epochs']} "
+        #     f"(Loss: {loss_display}, Val Loss: {val_loss_display})"
+        # )
     else: # Untuk progress antara 50% dan sebelum epoch pertama
-        training_status["status"] = f"Memulai training model... ({training_status['progress']})"
+        training_status["status"] = f"Memulai training model..."
     
     loss_str = f"{training_status['current_loss']:.4f}" if training_status['current_loss'] is not None else "N/A"
     val_loss_str = f"{training_status['current_val_loss']:.4f}" if training_status['current_val_loss'] is not None else "N/A"

@@ -137,7 +137,7 @@ def train_and_save_model(progress_callback=None):
         print(f"MAE: {mae:.2f}")
         print(f"MSE: {mse:.2f}")
         print(f"RMSE: {rmse:.2f}")
-        print(f"MAPE: {mae:.2f}")
+        print(f"MAPE: {mape:.2f}")
         
         # Pastikan direktori untuk menyimpan plot ada
         plots_dir = 'static/plots/train_model'
