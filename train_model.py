@@ -125,16 +125,19 @@ def train_and_save_model(progress_callback=None):
         mae = mean_absolute_error(y_true, y_pred)
         mse = mean_squared_error(y_true, y_pred)
         rmse = np.sqrt(mse) # RMSE adalah akar kuadrat dari MSE
-
+        mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+        
         evaluation_metrics = {
             "mae": float(mae),
             "mse": float(mse),
-            "rmse": float(rmse)
+            "rmse": float(rmse),
+            "mape": float(mape)
         }
 
         print(f"MAE: {mae:.2f}")
         print(f"MSE: {mse:.2f}")
         print(f"RMSE: {rmse:.2f}")
+        print(f"MAPE: {mae:.2f}")
         
         # Pastikan direktori untuk menyimpan plot ada
         plots_dir = 'static/plots/train_model'
