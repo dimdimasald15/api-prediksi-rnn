@@ -23,7 +23,7 @@ training_status = {
     "is_training": False,
     "status": "idle",
     "error": None,
-     "progress": "0%",
+    "progress": "0%",
     "current_epoch": 0,
     "total_epochs": 0,
     "current_loss": None,

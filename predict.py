@@ -15,7 +15,6 @@ def predict():
             return jsonify({'error': 'Body request kosong'}), 400
         
         customer_id = data.get('customer_id')
-        customer_nama = data.get('nama')
         if not customer_id:
             return jsonify({'error': 'customer_id tidak disediakan'}), 400
             
@@ -25,7 +24,6 @@ def predict():
 
         result = predict_customer(
             customer_id=customer_id,
-            nama=customer_nama,
             jumlah_bulan=jumlah_bulan
         )
 
