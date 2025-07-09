@@ -4,6 +4,7 @@ import os
 import json
 import threading
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 from train_model import train_bp
 from predict import predict_bp
 from predict_batch import predict_batch_bp
@@ -214,4 +215,4 @@ def get_training_history():
     return jsonify({'training_history': data}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    app.run(debug=False, host='0.0.0.0', port=8000)

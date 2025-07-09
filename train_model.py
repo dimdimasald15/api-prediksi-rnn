@@ -2,8 +2,9 @@ from flask import Blueprint
 import pandas as pd
 import numpy as np
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
 from utils import (
     get_db_connection,

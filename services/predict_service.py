@@ -1,6 +1,7 @@
 # services/predict_service.py
 import numpy as np
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 import pandas as pd
 from pandas import isna
 import os
