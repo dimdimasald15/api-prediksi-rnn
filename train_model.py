@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.layers import SimpleRNN, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
 from utils import (
     get_db_connection,
@@ -83,9 +83,9 @@ def train_and_save_model(progress_callback=None):
 
         update_progress(50)
 
-        # Step 4: Definisikan model LSTM
+        # Step 4: Definisikan model SimpleRNN
         model = Sequential([
-            LSTM(64, activation='relu', input_shape=(12, X.shape[2])),
+            SimpleRNN(64, activation='relu', input_shape=(12, X.shape[2])),
             Dense(1)
         ])
         model.compile(optimizer='adam', loss='mse')
