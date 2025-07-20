@@ -9,8 +9,8 @@ import logging
 import json
 
 from utils import (
-    MODEL_PATH, X_SCALER_PATH, Y_SCALER_PATH,
-    get_db_connection, load_scaler)
+    MODEL_PATH, X_SCALER_PATH, Y_SCALER_PATH,DAYA_SCALER_PATH, ENCODER_INFO_PATH,
+    get_db_connection, load_scaler, load_encoder_info)
 from helper.redis_helper import redis_client, redis_connection_required
 from helper.generate_plot_helper import generate_plot
 
@@ -28,13 +28,22 @@ def predict_customer(customer_id, jumlah_bulan, prefetched_data=None):
     model = load_model()
     x_scaler = load_scaler(X_SCALER_PATH)
     y_scaler = load_scaler(Y_SCALER_PATH)
+    daya_scaler = load_scaler(DAYA_SCALER_PATH) # Muat scaler untuk daya
+    encoder_info = load_encoder_info(ENCODER_INFO_PATH) # Muat informasi encoder
 
+    tarif_cols = encoder_info['tarif_columns']
+    kategori_cols = encoder_info['kategori_columns']
+    static_feature_columns_order = encoder_info['static_feature_columns_order']
+    num_static_features = len(static_feature_columns_order)
+
+    df_customer_raw = None
+    df_usage = None
     # Gunakan data hasil prefetch jika tersedia
     if prefetched_data is not None:
-        df_customer = prefetched_data.get('customer')
+        df_customer_raw = prefetched_data.get('customer')
         df_usage = prefetched_data.get('consumptions')
 
-        if df_customer is None or df_usage is None or df_usage.empty or len(df_usage) < 12:
+        if df_customer_raw is None or df_usage is None or df_usage.empty or len(df_usage) < 12:
             raise ValueError(f"Data tidak lengkap untuk customer_id {customer_id} (prefetched)")
     else:
         # Fetch dari database jika data belum diprefetch
@@ -52,23 +61,60 @@ def predict_customer(customer_id, jumlah_bulan, prefetched_data=None):
             raise ValueError("Data historis tidak mencukupi")
 
         query_customer = f"""
-            SELECT nama, tarif, daya, kategori FROM customers
-            WHERE id = {customer_id}
+            SELECT u.name as nama, c.tarif, c.daya, c.kategori 
+            FROM customers as c
+            JOIN users u ON u.id = c.user_id
+            WHERE c.id = {customer_id}
         """
         with engine.connect() as conn:
-            df_customer = pd.read_sql(query_customer, conn)
+            df_customer_raw = pd.read_sql(query_customer, conn)
 
-        if df_customer.empty:
+        if df_customer_raw.empty:
             raise ValueError("Customer tidak ditemukan")
 
-    nama = df_customer.iloc[0]['nama']
-    usage = df_usage['pemakaian_kwh'].values[::-1]
-    bulan = df_usage['bulan'].values[::-1]
-    tahun = df_usage['tahun'].values[::-1]
+    # --- Preprocessing Fitur Statis untuk Prediksi ---
+    # Ambil nilai tarif, daya, kategori dari df_customer_raw
+    customer_tarif = df_customer_raw.iloc[0]['tarif']
+    customer_daya = df_customer_raw.iloc[0]['daya']
+    customer_kategori = df_customer_raw.iloc[0]['kategori']
 
-    input_sequence = [[val] for val in usage[-12:]]
-    input_array = np.array(input_sequence).reshape(1, 12, 1)
-    input_scaled = x_scaler.transform(input_array.reshape(-1, 1)).reshape(input_array.shape)
+    # Buat DataFrame sementara untuk One-Hot Encoding agar konsisten dengan pelatihan
+    # Pastikan semua kemungkinan kolom one-hot ada, bahkan jika nilainya 0
+    temp_df_static = pd.DataFrame(columns=['tarif', 'kategori'])
+    temp_df_static.loc[0] = [customer_tarif, customer_kategori]
+    
+    # Lakukan One-Hot Encoding
+    temp_df_static = pd.get_dummies(temp_df_static, columns=['tarif', 'kategori'], prefix=['tarif', 'kategori'])
+
+    # Tambahkan kolom one-hot yang mungkin tidak ada di temp_df_static
+    # Ini penting agar urutan dan jumlah kolom one-hot konsisten dengan saat training
+    for col in tarif_cols + kategori_cols:
+        if col not in temp_df_static.columns:
+            temp_df_static[col] = 0 # Tambahkan kolom dengan nilai 0 jika tidak ada
+
+    # Scaling daya
+    customer_daya_scaled = daya_scaler.transform([[customer_daya]])[0][0]
+    temp_df_static['daya_scaled'] = customer_daya_scaled
+
+    # Ambil fitur statis dalam urutan yang benar (sesuai saat training)
+    # Pastikan semua kolom yang diharapkan ada di temp_df_static
+    missing_static_cols = [col for col in static_feature_columns_order if col not in temp_df_static.columns]
+    if missing_static_cols:
+       for col in missing_static_cols:
+            temp_df_static[col] = 0
+
+    static_features_values = temp_df_static[static_feature_columns_order].iloc[0].values.tolist()
+    
+    nama = df_customer_raw.iloc[0]['nama']
+    usage = df_usage['pemakaian_kwh'].values[::-1]
+    
+    input_sequence = []
+    for val in usage[-12:]: # Ambil 12 bulan terakhir
+        input_sequence.append([val] + static_features_values)
+    
+    input_array = np.array(input_sequence).reshape(1, 12, 1 + num_static_features)
+    input_scaled_flat = x_scaler.transform(input_array.reshape(-1, input_array.shape[-1]))
+    input_scaled = input_scaled_flat.reshape(input_array.shape)
 
     prediksi = []
     current_input = input_scaled.copy()
@@ -77,18 +123,21 @@ def predict_customer(customer_id, jumlah_bulan, prefetched_data=None):
         pred_scaled = model.predict(current_input, verbose=0)[0][0]
         prediksi.append(pred_scaled)
 
-        new_features = np.concatenate([current_input[0, 1:, :], np.array([[pred_scaled]])])
-        current_input = new_features.reshape(1, 12, 1)
+        new_features = np.concatenate([current_input[0, 1:, :], np.array([[pred_scaled] + static_features_values])])
+        current_input = new_features.reshape(1, 12, 1 + num_static_features)
 
     y_pred_array = np.array(prediksi).reshape(-1, 1)
     prediksi_asli = y_scaler.inverse_transform(y_pred_array).flatten()
 
+    bulan_hist = df_usage['bulan'].values[-12:][::-1] # Pastikan urutan kronologis
+    tahun_hist = df_usage['tahun'].values[-12:][::-1] # Pastikan urutan kronologis
+
     plot_filename = generate_plot(
         customer_id=customer_id,
         nama=nama,
-        usage=usage,
-        bulan=bulan,
-        tahun=tahun,
+        usage=usage[-12:], # Hanya 12 bulan terakhir untuk plot
+        bulan=bulan_hist,
+        tahun=tahun_hist,
         prediksi_asli=prediksi_asli,
         jumlah_bulan=jumlah_bulan
     )
@@ -128,7 +177,7 @@ def get_customers_data(customer_ids):
     query = f"""
         SELECT 
             c.id as customer_id, 
-            c.nama, 
+            u.name as nama, 
             c.tarif, 
             c.daya, 
             c.kategori,
@@ -144,8 +193,9 @@ def get_customers_data(customer_ids):
             SELECT * FROM consumptions
             ORDER BY tahun DESC, bulan DESC
         ) AS cons_sorted ON cons_sorted.customer_id = c.id
+        LEFT JOIN users u ON u.id = c.user_id
         WHERE c.id IN ({placeholders})
-        GROUP BY c.id, c.nama, c.tarif, c.daya, c.kategori
+        GROUP BY c.id, u.name, c.tarif, c.daya, c.kategori
         ORDER BY c.id
     """
     
@@ -178,12 +228,10 @@ def predict_batch_results(customerIds, batch_id, jumlah_bulan):
                             try:
                                 consumptions_data = json.loads(consumptions_data)
                             except json.JSONDecodeError:
-                                logger.warning(f"customer_id {row['customer_id']}: Field 'consumptions' tidak bisa di-decode sebagai JSON")
                                 continue
 
                         # Validasi apakah hasil parsing benar-benar list
                         if not isinstance(consumptions_data, list):
-                            logger.warning(f"Prediction failed for customer_id {row['customer_id']}: Field 'consumptions' tidak berbentuk list yang valid")
                             continue
                         
                         consumptions = pd.DataFrame(consumptions_data)

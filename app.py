@@ -8,6 +8,7 @@ tf.config.set_visible_devices([], 'GPU')
 from train_model import train_bp
 from predict import predict_bp
 from predict_batch import predict_batch_bp
+from heatmap_consumptions import heatmap_consumptions_bp
 from utils import PLOT_FOLDER
 
 
@@ -15,6 +16,7 @@ app = Flask(__name__)
 app.register_blueprint(train_bp)
 app.register_blueprint(predict_bp)
 app.register_blueprint(predict_batch_bp)
+app.register_blueprint(heatmap_consumptions_bp)
 
 model = None
 model_path = 'model_rnn_konsumsi.keras'

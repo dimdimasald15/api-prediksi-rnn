@@ -8,7 +8,8 @@ from tensorflow.keras.layers import SimpleRNN, Dense, Dropout
 from sklearn.preprocessing import MinMaxScaler
 from utils import (
     get_db_connection,
-    save_scaler
+    save_scaler,
+    save_encoder_info
 )
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import matplotlib
@@ -46,35 +47,80 @@ def train_and_save_model(progress_callback=None):
         if df.empty:
             raise Exception("Data tidak ditemukan")
 
-        # Step 2: Preprocessing time series + fitur statis
-        grouped = df.groupby('customer_id')
+        #  Step 2: Preprocessing fitur statis (tarif, daya, kategori)
+        # Buat salinan DataFrame untuk preprocessing fitur statis
+        df_processed = df.copy()
+
+        # One-Hot Encode 'tarif' dan 'kategori'
+        # pd.get_dummies akan membuat kolom baru untuk setiap kategori unik
+        df_processed = pd.get_dummies(df_processed, columns=['tarif', 'kategori'], prefix=['tarif', 'kategori'])
+
+        # Simpan nama kolom one-hot yang dihasilkan untuk konsistensi saat prediksi
+        tarif_cols = [col for col in df_processed.columns if col.startswith('tarif_')]
+        kategori_cols = [col for col in df_processed.columns if col.startswith('kategori_')]
+
+        # Scaling 'daya'
+        daya_scaler = MinMaxScaler()
+        # Fit dan transform hanya kolom 'daya'
+        df_processed['daya_scaled'] = daya_scaler.fit_transform(df_processed[['daya']])
+        save_scaler(daya_scaler, 'scaler_daya.pkl') # Simpan scaler daya
+
+        # Identifikasi semua kolom fitur statis yang akan digunakan
+        # Urutkan untuk memastikan konsistensi urutan fitur saat input ke model
+        static_feature_cols = sorted(tarif_cols + kategori_cols + ['daya_scaled'])
+
+        # Simpan informasi encoder (nama kolom one-hot dan urutan fitur statis)
+        encoder_info = {
+            'tarif_columns': tarif_cols,
+            'kategori_columns': kategori_cols,
+            'static_feature_columns_order': static_feature_cols # Urutan fitur untuk input model
+        }
+        save_encoder_info(encoder_info, 'encoder_info.pkl')
+
+        # Sekarang, siapkan data untuk SimpleRNN
+        grouped = df_processed.groupby('customer_id') # Group DataFrame yang sudah diproses
         X, y = [], []
+        num_static_features = len(static_feature_cols) # Jumlah fitur statis per time step
 
         for customer_id, group_data in grouped:
             usage = group_data['pemakaian_kwh'].values
-            if len(usage) < 13:
+            
+            # Ambil fitur statis untuk customer ini (mereka konstan dalam grup)
+            # Pastikan urutan kolom sesuai dengan static_feature_cols yang sudah diurutkan
+            static_features_values = group_data[static_feature_cols].iloc[0].values 
+            
+            # Memastikan ada cukup data untuk jendela 12 bulan dan 1 target
+            if len(usage) < 13: 
                 continue
 
             for i in range(len(usage) - 12):
-                window = usage[i:i+12]
-                target = usage[i+12]
-                X.append([[val] for val in window])
-                y.append(target)
+                window_kwh = usage[i:i+12] # Jendela 12 bulan pemakaian KWH
+                target_kwh = usage[i+12]   # Target bulan ke-13
+                
+                # Gabungkan window KWH dengan fitur statis untuk setiap langkah waktu dalam window
+                combined_window = []
+                for kwh_val in window_kwh:
+                    # Setiap elemen dalam sequence akan menjadi [kwh_val, static_feature_1, static_feature_2, ...]
+                    combined_window.append([kwh_val] + static_features_values.tolist())
+                    
+                X.append(combined_window)
+                y.append(target_kwh)
 
         if not X or not y:
-            raise Exception("Data tidak cukup untuk pelatihan model")
+            raise Exception("Data tidak cukup untuk pelatihan model setelah preprocessing fitur statis.")
 
         update_progress(30)
 
-        # Step 3: Scaling
+        # Step 3: Scaling seluruh fitur input (KWH + statis) dan target
         X = np.array(X)
         y = np.array(y).reshape(-1, 1)
 
-        x_scaler = MinMaxScaler()
-        y_scaler = MinMaxScaler()
+        x_scaler = MinMaxScaler() # Scaler untuk seluruh fitur input (KWH + statis)
+        y_scaler = MinMaxScaler() # Scaler untuk target KWH
 
-        # Scaling X
-        X_flat = X.reshape(-1, X.shape[-1])  # (total * 12, 13)
+        # Scaling X: Flatten X, scale, lalu reshape kembali
+        # X_flat akan memiliki dimensi (jumlah_sampel * sequence_length, jumlah_fitur_per_timestep)
+        X_flat = X.reshape(-1, X.shape[-1])
         X_scaled_flat = x_scaler.fit_transform(X_flat)
         X_scaled = X_scaled_flat.reshape(X.shape)
 
@@ -84,8 +130,10 @@ def train_and_save_model(progress_callback=None):
         update_progress(50)
 
         # Step 4: Definisikan model SimpleRNN
+        # input_shape akan menjadi (sequence_length, 1 (kwh) + jumlah_fitur_statis)
         model = Sequential([
-            SimpleRNN(64, activation='relu', input_shape=(12, X.shape[2])),
+            SimpleRNN(64, activation='relu', input_shape=(12, 1 + num_static_features)),
+            Dropout(0.2), # Tambahkan Dropout untuk mencegah overfitting
             Dense(1)
         ])
         model.compile(optimizer='adam', loss='mse')
@@ -179,8 +227,8 @@ def train_and_save_model(progress_callback=None):
 
         # Step 7: Simpan model dan scaler
         model.save('model_rnn_konsumsi.keras')
-        save_scaler(x_scaler)
-        save_scaler(y_scaler, 'scaler_y.pkl')
+        save_scaler(x_scaler, 'scaler_X.pkl') # Simpan scaler untuk input X
+        save_scaler(y_scaler, 'scaler_y.pkl') # Simpan scaler untuk target y
 
         update_progress(100)
         return model
