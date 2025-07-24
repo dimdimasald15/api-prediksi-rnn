@@ -58,11 +58,13 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
         heatmap_data = heatmap_data.fillna(0)
 
         # --- Standarisasi Kategori Warna (Tinggi, Sedang, Rendah) ---
-        threshold_rendah_ke_sedang = 100000  
-        threshold_sedang_ke_tinggi = 180000 
+        threshold_rendah_ke_sedang = 150000  
+        threshold_sedang_ke_tinggi = 206000 
 
         # Menentukan batas-batas untuk normalisasi warna
-        max_kwh_data = heatmap_data.max().max()
+        # max_kwh_data = heatmap_data.max().max()
+        max_kwh_data = 400000
+        
         # Jika semua nilai 0, pastikan batas atas tidak terlalu kecil
         if max_kwh_data == 0:
             bounds = [0, 1] # Hanya untuk 0, sisanya akan sama warnanya
@@ -70,6 +72,7 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
             # Pastikan batas atas lebih besar dari nilai maksimum data
             bounds = [0, threshold_rendah_ke_sedang, threshold_sedang_ke_tinggi, max_kwh_data + 1]
 
+        print(f"Batas normalisasi warna: {bounds}")
         # Mendefinisikan warna secara eksplisit untuk setiap kategori
         # Urutan: Warna untuk range pertama, warna untuk range kedua, dst.
         colors = ["#2CA02C", "#FFD700", "#DC143C"] # Hijau (Rendah), Kuning (Sedang), Merah (Tinggi)
@@ -77,6 +80,7 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
 
         # Membuat objek normalisasi batas
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
+        print(f"Normalisasi warna dibuat dengan batas: {bounds}")
 
         # Buat heatmap
         plt.figure(figsize=(12, 8)) # Ukuran plot
@@ -85,6 +89,7 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
             annot=True,      # Menampilkan nilai di setiap sel
             fmt=".0f",       # Format angka tanpa desimal
             cmap=cmap,       # Menggunakan colormap kustom
+            norm=norm,       # Menerapkan normalisasi BoundaryNorm di sini
             linewidths=.2,   # Garis antar sel
             linecolor='black', # Warna garis
             cbar_kws={'label': 'Total Konsumsi (kWh)'} # Label color bar
