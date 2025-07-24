@@ -72,7 +72,6 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
             # Pastikan batas atas lebih besar dari nilai maksimum data
             bounds = [0, threshold_rendah_ke_sedang, threshold_sedang_ke_tinggi, max_kwh_data + 1]
 
-        print(f"Batas normalisasi warna: {bounds}")
         # Mendefinisikan warna secara eksplisit untuk setiap kategori
         # Urutan: Warna untuk range pertama, warna untuk range kedua, dst.
         colors = ["#2CA02C", "#FFD700", "#DC143C"] # Hijau (Rendah), Kuning (Sedang), Merah (Tinggi)
@@ -80,7 +79,6 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
 
         # Membuat objek normalisasi batas
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
-        print(f"Normalisasi warna dibuat dengan batas: {bounds}")
 
         # Buat heatmap
         plt.figure(figsize=(12, 8)) # Ukuran plot
@@ -110,14 +108,14 @@ def generate_consumption_heatmap(output_filename="consumption_heatmap.png"):
         plt.close() # Penting untuk menutup plot agar tidak memakan memori
 
         print(f"Heatmap berhasil disimpan ke: {plot_path}")
-        # return plot_path
         try:
+            # This is already a valid Flask response
             return send_from_directory(plots_dir, output_filename)
         except FileNotFoundError:
-            return "File not found", 404
+            return jsonify({"error": "File not found"}), 404
         except Exception as e:
-            return "Internal Server Error", 500
+            return jsonify({"error": f"Internal Server Error: {e}"}), 500
 
     except Exception as e:
         print(f"Terjadi kesalahan saat membuat heatmap: {e}")
-        return None
+        return jsonify({"error": f"Internal Server Error: {e}"}), 500
